@@ -171,6 +171,22 @@ export function TodayView({ state, onChange, onOpenSettings }: Props) {
           </button>
         </div>
       )}
+
+      <div className="mt-8 flex justify-center">
+        <button
+          onClick={() => {
+            if (confirm(t.resetDayConfirm)) {
+              onChange({
+                ...state,
+                day: { ...state.day, wakeMin: null, events: [] }
+              });
+            }
+          }}
+          className="rounded-full border border-red-200 bg-white/60 px-4 py-2 text-xs font-medium text-red-600 active:bg-red-50"
+        >
+          ↺ {t.resetDay}
+        </button>
+      </div>
     </div>
   );
 }
