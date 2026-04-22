@@ -2,8 +2,10 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const basePath = process.env.BASE_PATH || '/Mila-scheduler/';
+
 export default defineConfig({
-  base: '/Mila-scheduler/',
+  base: basePath,
   plugins: [
     react(),
     VitePWA({
@@ -18,8 +20,8 @@ export default defineConfig({
         background_color: '#fdf2f8',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/Mila-scheduler/',
-        start_url: '/Mila-scheduler/',
+        scope: basePath,
+        start_url: basePath,
         icons: [
           {
             src: 'favicon.svg',
