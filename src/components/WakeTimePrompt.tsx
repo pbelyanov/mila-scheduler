@@ -12,9 +12,14 @@ export function WakeTimePrompt({ onSet }: Props) {
       <div className="text-6xl">🌅</div>
       <h2 className="text-2xl font-semibold text-pink-700">{t.noWakeYet}</h2>
       <p className="text-sm text-gray-600">{t.noWakeDesc}</p>
-      <label className="flex w-full flex-col gap-2 text-left text-sm font-medium text-gray-700">
+      <label className="flex w-full flex-col items-center gap-3 text-center text-sm font-medium text-gray-700">
         {t.wakePrompt}
-        <TimeInput valueMin={val} onChange={setVal} className="w-full rounded-xl border border-pink-200 bg-white px-4 py-3 text-2xl font-bold text-pink-700 focus:border-pink-500 focus:outline-none" />
+        <TimeInput
+          valueMin={val}
+          onChange={setVal}
+          size="lg"
+          className="inline-flex items-center gap-2"
+        />
       </label>
       <button
         onClick={() => onSet(val)}
