@@ -13,7 +13,7 @@ export function defaultTemplate(): Template {
     wakeWindowsMin: [90, 105, 120, 120, 135],
     connectedWakeWindowMin: 120,
     catnapDurationMin: 20,
-    lastNapStartLatestMin: fromHHMM('17:00')
+    lastNapStartLatestMin: fromHHMM('17:15')
   };
 }
 
