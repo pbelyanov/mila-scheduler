@@ -12,8 +12,30 @@ export function defaultTemplate(): Template {
     napTargetsMin: [40, 40, 40, 40],
     wakeWindowsMin: [90, 105, 120, 120, 135],
     connectedWakeWindowMin: 120,
-    catnapDurationMin: 20
+    catnapDurationMin: 20,
+    lastNapStartLatestMin: fromHHMM('17:00')
   };
+}
+
+function dropLateNaps(events: DayEvent[], template: Template): DayEvent[] {
+  const cutoff = template.lastNapStartLatestMin;
+  const toRemove = new Set<string>();
+  for (const e of events) {
+    if (
+      e.kind === 'nap-start' &&
+      !e.done &&
+      !e.isCatnap &&
+      e.plannedMin > cutoff
+    ) {
+      toRemove.add(e.id);
+      const pair = events.find(
+        (x) => x.kind === 'nap-end' && x.napIndex === e.napIndex
+      );
+      if (pair) toRemove.add(pair.id);
+    }
+  }
+  if (toRemove.size === 0) return events;
+  return events.filter((e) => !toRemove.has(e.id));
 }
 
 function kindOrder(k: DayEvent['kind']): number {
@@ -189,7 +211,7 @@ export function generateEvents(wakeMin: number, template: Template): DayEvent[] 
     done: false
   });
 
-  return sortEvents(resolveFeedNapOverlaps(events, template));
+  return sortEvents(dropLateNaps(resolveFeedNapOverlaps(events, template), template));
 }
 
 export function recalibrate(day: DayState, template: Template): DayEvent[] {
@@ -283,7 +305,7 @@ export function recalibrate(day: DayState, template: Template): DayEvent[] {
   const pendingWake = pendingEvents.find((e) => e.kind === 'wake');
   if (pendingWake) updated.push(pendingWake);
 
-  return sortEvents(resolveFeedNapOverlaps(updated, template));
+  return sortEvents(dropLateNaps(resolveFeedNapOverlaps(updated, template), template));
 }
 
 export function connectCurrentNap(day: DayState, template: Template): DayEvent[] {

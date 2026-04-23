@@ -104,6 +104,13 @@ export function SettingsView({ state, onChange, onClose }: Props) {
           />
         </Field>
 
+        <Field label={t.lastNapLatestLabel} help={t.lastNapLatestHelp}>
+          <TimeInput
+            valueMin={draft.lastNapStartLatestMin}
+            onChange={(v) => set('lastNapStartLatestMin', v)}
+          />
+        </Field>
+
         <div className="mt-6 flex gap-2">
           <button
             onClick={saveTemplate}

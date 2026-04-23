@@ -27,6 +27,7 @@ export type Template = {
   wakeWindowsMin: number[];
   connectedWakeWindowMin: number;
   catnapDurationMin: number;
+  lastNapStartLatestMin: number;
 };
 
 export type DayState = {
