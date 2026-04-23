@@ -395,6 +395,47 @@ export function addCatnap(day: DayState, template: Template): DayEvent[] {
   return recalibrate({ ...day, events: updated }, template);
 }
 
+export function applyTemplateChange(
+  day: DayState,
+  newTemplate: Template
+): DayEvent[] {
+  if (day.wakeMin === null) return day.events;
+
+  const fresh = generateEvents(day.wakeMin, newTemplate);
+  const result: DayEvent[] = [];
+
+  for (const freshEvt of fresh) {
+    const match = day.events.find(
+      (old) =>
+        old.kind === freshEvt.kind &&
+        old.napIndex === freshEvt.napIndex &&
+        old.feedIndex === freshEvt.feedIndex
+    );
+    if (match && match.done) {
+      result.push({ ...match });
+    } else if (match) {
+      result.push({ ...freshEvt, id: match.id });
+    } else {
+      result.push(freshEvt);
+    }
+  }
+
+  for (const old of day.events) {
+    const hasMatch = result.some(
+      (r) =>
+        r.kind === old.kind &&
+        r.napIndex === old.napIndex &&
+        r.feedIndex === old.feedIndex
+    );
+    if (hasMatch) continue;
+    if (old.done || old.isCatnap) {
+      result.push({ ...old });
+    }
+  }
+
+  return recalibrate({ ...day, events: sortEvents(result) }, newTemplate);
+}
+
 export function totalPlannedDaySleepMin(events: DayEvent[]): number {
   const starts = events.filter((e) => e.kind === 'nap-start');
   return starts.reduce((sum, e) => sum + (e.napDurationMin ?? 0), 0);

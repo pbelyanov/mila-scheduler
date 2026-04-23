@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { AppState, Template } from '../types';
 import { t } from '../i18n';
 import { TimeInput } from './TimeInput';
-import { defaultTemplate } from '../schedule';
+import { applyTemplateChange, defaultTemplate } from '../schedule';
 
 type Props = {
   state: AppState;
@@ -17,7 +17,12 @@ export function SettingsView({ state, onChange, onClose }: Props) {
     setDraft((d) => ({ ...d, [k]: v }));
 
   const saveTemplate = () => {
-    onChange({ ...state, template: draft });
+    const newEvents = applyTemplateChange(state.day, draft);
+    onChange({
+      ...state,
+      template: draft,
+      day: { ...state.day, events: newEvents }
+    });
     onClose();
   };
 
