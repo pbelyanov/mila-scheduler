@@ -9,7 +9,7 @@ export function defaultTemplate(): Template {
     bedtimeMin: fromHHMM('20:00'),
     ritualOffsetMin: 20,
     feedIntervalMin: 180,
-    napTargetsMin: [90, 40, 40, 40],
+    napTargetsMin: [40, 40, 40, 40],
     wakeWindowsMin: [90, 105, 120, 120, 135],
     connectedWakeWindowMin: 120,
     catnapDurationMin: 20
@@ -51,6 +51,47 @@ function planFeeds(wakeMin: number, bedtimeMin: number, intervalMin: number): nu
   }
   feeds.push(bedtimeMin);
   return feeds;
+}
+
+const FEED_NAP_BUFFER_MIN = 5;
+
+function resolveFeedNapOverlaps(events: DayEvent[], template: Template): DayEvent[] {
+  const result = events.map((e) => ({ ...e }));
+
+  const pendingNapStarts = result
+    .filter((e) => e.kind === 'nap-start' && !e.done)
+    .sort((a, b) => a.plannedMin - b.plannedMin);
+
+  for (const napStart of pendingNapStarts) {
+    const napEnd = result.find(
+      (e) => e.kind === 'nap-end' && e.napIndex === napStart.napIndex && !e.done
+    );
+    if (!napEnd) continue;
+
+    const overlapping = result.filter(
+      (e) =>
+        e.kind === 'feed' &&
+        !e.done &&
+        e.plannedMin !== template.bedtimeMin &&
+        e.plannedMin > napStart.plannedMin &&
+        e.plannedMin < napEnd.plannedMin
+    );
+
+    for (const feed of overlapping) {
+      const napDur = napEnd.plannedMin - napStart.plannedMin;
+      if (napDur <= 0) continue;
+      const offset = feed.plannedMin - napStart.plannedMin;
+      if (offset < napDur / 2) {
+        const newStart = feed.plannedMin + FEED_NAP_BUFFER_MIN;
+        napStart.plannedMin = newStart;
+        napEnd.plannedMin = newStart + napDur;
+      } else {
+        feed.plannedMin = napEnd.plannedMin + FEED_NAP_BUFFER_MIN;
+      }
+    }
+  }
+
+  return result;
 }
 
 function redistributeFeeds(
@@ -148,7 +189,7 @@ export function generateEvents(wakeMin: number, template: Template): DayEvent[] 
     done: false
   });
 
-  return sortEvents(events);
+  return sortEvents(resolveFeedNapOverlaps(events, template));
 }
 
 export function recalibrate(day: DayState, template: Template): DayEvent[] {
@@ -242,7 +283,7 @@ export function recalibrate(day: DayState, template: Template): DayEvent[] {
   const pendingWake = pendingEvents.find((e) => e.kind === 'wake');
   if (pendingWake) updated.push(pendingWake);
 
-  return sortEvents(updated);
+  return sortEvents(resolveFeedNapOverlaps(updated, template));
 }
 
 export function connectCurrentNap(day: DayState, template: Template): DayEvent[] {

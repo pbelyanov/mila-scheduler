@@ -11,6 +11,7 @@ import {
   totalPlannedDaySleepMin
 } from '../schedule';
 import { EventCard } from './EventCard';
+import { NapCard } from './NapCard';
 import { WakeTimePrompt } from './WakeTimePrompt';
 
 type Props = {
@@ -64,19 +65,61 @@ export function TodayView({ state, onChange, onOpenSettings }: Props) {
     updateEvents(events);
   };
 
-  const currentEventId = useMemo(() => {
-    const pending = state.day.events.filter((e) => !e.done);
-    if (pending.length === 0) return null;
+  const currentKey = useMemo<string | null>(() => {
     const activeNapStart = [...state.day.events]
       .reverse()
-      .find((e) => e.kind === 'nap-start' && e.done);
-    if (activeNapStart) {
-      const activeNapEnd = pending.find(
-        (e) => e.kind === 'nap-end' && e.napIndex === activeNapStart.napIndex
+      .find(
+        (e) =>
+          e.kind === 'nap-start' &&
+          e.done &&
+          state.day.events.some(
+            (x) => x.kind === 'nap-end' && x.napIndex === e.napIndex && !x.done
+          )
       );
-      if (activeNapEnd) return activeNapEnd.id;
+    if (activeNapStart) return `nap-${activeNapStart.napIndex}`;
+    const sorted = [...state.day.events].sort((a, b) => a.plannedMin - b.plannedMin);
+    const pending = sorted.find((e) => !e.done);
+    if (!pending) return null;
+    if (pending.kind === 'nap-start' || pending.kind === 'nap-end') {
+      return `nap-${pending.napIndex}`;
     }
-    return pending[0].id;
+    return pending.id;
+  }, [state.day.events]);
+
+  const displayItems = useMemo(() => {
+    type Item =
+      | { type: 'event'; event: DayEvent; sortKey: number }
+      | { type: 'nap'; start: DayEvent; end: DayEvent; sortKey: number };
+    const items: Item[] = [];
+    const used = new Set<string>();
+    for (const e of state.day.events) {
+      if (used.has(e.id)) continue;
+      if (e.kind === 'nap-start') {
+        const pair = state.day.events.find(
+          (x) => x.kind === 'nap-end' && x.napIndex === e.napIndex
+        );
+        if (pair) {
+          items.push({
+            type: 'nap',
+            start: e,
+            end: pair,
+            sortKey: e.actualMin ?? e.plannedMin
+          });
+          used.add(e.id);
+          used.add(pair.id);
+          continue;
+        }
+      }
+      if (e.kind === 'nap-end') continue;
+      items.push({
+        type: 'event',
+        event: e,
+        sortKey: e.actualMin ?? e.plannedMin
+      });
+      used.add(e.id);
+    }
+    items.sort((a, b) => a.sortKey - b.sortKey);
+    return items;
   }, [state.day.events]);
 
   const plannedSleep = totalPlannedDaySleepMin(state.day.events);
@@ -130,30 +173,56 @@ export function TodayView({ state, onChange, onOpenSettings }: Props) {
       </section>
 
       <section className="mt-4 flex flex-col gap-3">
-        {state.day.events.map((e) => {
-          const isCurrent = e.id === currentEventId;
-          const activeNap =
-            isCurrent && e.kind === 'nap-end';
+        {displayItems.map((item) => {
+          if (item.type === 'event') {
+            const e = item.event;
+            const isCurrent = e.id === currentKey;
+            return (
+              <EventCard
+                key={e.id}
+                event={e}
+                state={e.done ? 'past' : isCurrent ? 'current' : 'upcoming'}
+                canConnect={false}
+                nowMinutes={now}
+                onAction={(a) => {
+                  if (a.kind === 'mark-done') markDone(e.id, a.actualMin);
+                  else if (a.kind === 'edit-actual') editActual(e.id, a.actualMin);
+                }}
+              />
+            );
+          }
+          const key = `nap-${item.start.napIndex}`;
+          const isCurrent = key === currentKey;
+          const isActive = item.start.done && !item.end.done;
+          const bothDone = item.start.done && item.end.done;
+          const napState = bothDone
+            ? 'past'
+            : isActive
+              ? 'active'
+              : isCurrent
+                ? 'current'
+                : 'upcoming';
           const canConnectThis =
-            activeNap && state.day.events.some((x) => x.kind === 'nap-start' && !x.done);
+            isActive &&
+            state.day.events.some(
+              (x) =>
+                x.kind === 'nap-start' &&
+                !x.done &&
+                x.napIndex !== item.start.napIndex
+            );
           return (
-            <EventCard
-              key={e.id}
-              event={e}
-              state={
-                e.done
-                  ? 'past'
-                  : activeNap
-                    ? 'active-nap'
-                    : isCurrent
-                      ? 'current'
-                      : 'upcoming'
-              }
-              canConnect={!!canConnectThis}
+            <NapCard
+              key={key}
+              start={item.start}
+              end={item.end}
+              state={napState}
+              canConnect={canConnectThis}
               nowMinutes={now}
               onAction={(a) => {
-                if (a.kind === 'mark-done') markDone(e.id, a.actualMin);
-                else if (a.kind === 'edit-actual') editActual(e.id, a.actualMin);
+                if (a.kind === 'mark-start') markDone(item.start.id, a.actualMin);
+                else if (a.kind === 'mark-end') markDone(item.end.id, a.actualMin);
+                else if (a.kind === 'edit-start') editActual(item.start.id, a.actualMin);
+                else if (a.kind === 'edit-end') editActual(item.end.id, a.actualMin);
                 else if (a.kind === 'connect') doConnect();
               }}
             />
