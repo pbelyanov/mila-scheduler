@@ -44,12 +44,42 @@ function computeWWTail(src: number[], n: number): number[] {
 function planFeeds(wakeMin: number, bedtimeMin: number, intervalMin: number): number[] {
   const feeds: number[] = [wakeMin];
   let t = wakeMin + intervalMin;
-  while (t < bedtimeMin - 30) {
+  const cutoff = bedtimeMin - intervalMin + 30;
+  while (t < cutoff) {
     feeds.push(t);
     t += intervalMin;
   }
   feeds.push(bedtimeMin);
   return feeds;
+}
+
+function redistributeFeeds(
+  doneFeeds: DayEvent[],
+  pendingFeeds: DayEvent[],
+  template: Template
+): DayEvent[] {
+  if (pendingFeeds.length === 0 || doneFeeds.length === 0) {
+    return pendingFeeds.map((f) => ({ ...f }));
+  }
+  const lastDone = doneFeeds[doneFeeds.length - 1];
+  const anchor = lastDone.actualMin ?? lastDone.plannedMin;
+  const bedtimeFeed = pendingFeeds[pendingFeeds.length - 1];
+  const intermediates = pendingFeeds.slice(0, -1);
+
+  const numGaps = intermediates.length + 1;
+  const available = template.bedtimeMin - anchor;
+  if (available <= 0 || numGaps <= 0) return pendingFeeds.map((f) => ({ ...f }));
+
+  const interval = Math.min(template.feedIntervalMin, available / numGaps);
+
+  const result: DayEvent[] = [];
+  let cursor = anchor;
+  for (const f of intermediates) {
+    cursor += interval;
+    result.push({ ...f, plannedMin: Math.round(cursor) });
+  }
+  result.push({ ...bedtimeFeed, plannedMin: template.bedtimeMin });
+  return result;
 }
 
 export function generateEvents(wakeMin: number, template: Template): DayEvent[] {
@@ -193,7 +223,8 @@ export function recalibrate(day: DayState, template: Template): DayEvent[] {
   }
 
   const pendingFeeds = pendingEvents.filter((e) => e.kind === 'feed');
-  updated.push(...pendingFeeds);
+  const doneFeeds = doneEvents.filter((e) => e.kind === 'feed');
+  updated.push(...redistributeFeeds(doneFeeds, pendingFeeds, template));
 
   const pendingRitual = pendingEvents.find((e) => e.kind === 'ritual');
   if (pendingRitual) {
